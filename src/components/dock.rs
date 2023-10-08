@@ -1,7 +1,7 @@
 use catppuccin_egui::Theme;
 use eframe::egui::{Ui, Widget, WidgetText};
 use egui_dock::TabViewer;
-use egui_tracing::EventCollector;
+use egui_tracing::{ui::Logs, EventCollector};
 
 use super::sidebar::{Sidebar, SidebarState};
 
@@ -46,7 +46,7 @@ impl<'a> TabViewer for DockTabViewer<'a> {
             DockTab::Sidebar(sidebar_state) => Sidebar::new(sidebar_state, self.theme).ui(ui),
             DockTab::InfoSidebar => ui.label("Info"),
             DockTab::DirView => ui.label("Dir View"),
-            DockTab::Log => ui.label("Log"),
+            DockTab::Log => Logs::new(self.log_event_collector.clone()).ui(ui),
             DockTab::Terminal => ui.label("Terminal"),
         };
     }
