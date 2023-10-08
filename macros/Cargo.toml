@@ -1,0 +1,16 @@
+[package]
+name = "macros"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+attribute-derive = "0.8.1"
+convert_case = "0.6.0"
+diagnostics = "0.1.0"
+manyhow = { version = "0.8.1", features = ["darling"] }
+proc-macro2 = "1.0.67"
+quote = "1.0.33"
+syn = "2.0.37"
