@@ -26,49 +26,51 @@
         crateOutputs = config.nci.outputs.${crateName};
 
         shellDeps = with pkgs; [
+          license-cli
+          
           cargo-expand
         ];
       in {
         nci = {
-            toolchainConfig = ./rust-toolchain.toml;
-            projects.${crateName}.path = ./.;
-            crates = {
-                "macros" = {
-                      export = true;
-                    };
+          toolchainConfig = ./rust-toolchain.toml;
+          projects.${crateName}.path = ./.;
+          crates = {
+            "macros" = {
+              export = true;
+            };
 
-                    ${crateName} = {
-                      export = true;
-                      runtimeLibs = with pkgs; with pkgs.xorg; [
-                        pkg-config
+          ${crateName} = {
+            export = true;
+            runtimeLibs = with pkgs; with pkgs.xorg; [
+              pkg-config
 
-                        wayland
+              wayland
 
-                        vulkan-loader
-                        vulkan-validation-layers
+              vulkan-loader
+              vulkan-validation-layers
 
-                        libGL
-                        libGLU
+              libGL
+              libGLU
 
-                        libX11
-                        libxkbcommon
-                        libxcb
-                        libXcursor
-                        libXrandr
-                        libXi
-                      ];
-                    };
+              libX11
+              libxkbcommon
+              libxcb
+              libXcursor
+              libXrandr
+              libXi
+            ];
           };
         };
-
-        devShells.default = crateOutputs.devShell.overrideAttrs (old: {
-          packages = (old.packages or []) ++ shellDeps;
-
-           shellHook = ''
-            ln -s
-           '';
-        });
-        packages.default = crateOutputs.packages.release;
       };
+
+      devShells.default = crateOutputs.devShell.overrideAttrs (old: {
+        packages = (old.packages or []) ++ shellDeps;
+
+         shellHook = ''
+          ln -s
+         '';
+      });
+      packages.default = crateOutputs.packages.release;
     };
+  };
 }
