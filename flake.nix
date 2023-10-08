@@ -9,68 +9,69 @@
     parts.inputs.nixpkgs-lib.follows = "nixpkgs";
   };
 
-  outputs = inputs @ {
-    parts,
-    nci,
-    ...
-  }:
-    parts.lib.mkFlake {inherit inputs;} {
-      systems = ["x86_64-linux"];
-      imports = [nci.flakeModule];
-      perSystem = {
-        pkgs,
-        config,
-        ...
-      }: let
-        crateName = "rsfm";
-        crateOutputs = config.nci.outputs.${crateName};
+  outputs =
+    inputs @ { parts
+    , nci
+    , ...
+    }:
+    parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" ];
+      imports = [ nci.flakeModule ];
+      perSystem =
+        { pkgs
+        , config
+        , ...
+        }:
+        let
+          crateName = "rsfm";
+          crateOutputs = config.nci.outputs.${crateName};
 
-        shellDeps = with pkgs; [
-          license-cli
-          
-          cargo-expand
-        ];
-      in {
-        nci = {
-          toolchainConfig = ./rust-toolchain.toml;
-          projects.${crateName}.path = ./.;
-          crates = {
-            "macros" = {
-              export = true;
+          shellDeps = with pkgs; [
+            nil
+            nixpkgs-fmt
+
+            license-cli
+
+            cargo-expand
+          ];
+        in
+        {
+          nci = {
+            toolchainConfig = ./rust-toolchain.toml;
+            projects.${crateName}.path = ./.;
+            crates = {
+              "macros" = {
+                export = true;
+              };
+
+              ${crateName} = {
+                export = true;
+                runtimeLibs = with pkgs; with pkgs.xorg; [
+                  pkg-config
+
+                  wayland
+
+                  vulkan-loader
+                  vulkan-validation-layers
+
+                  libGL
+                  libGLU
+
+                  libX11
+                  libxkbcommon
+                  libxcb
+                  libXcursor
+                  libXrandr
+                  libXi
+                ];
+              };
             };
-
-          ${crateName} = {
-            export = true;
-            runtimeLibs = with pkgs; with pkgs.xorg; [
-              pkg-config
-
-              wayland
-
-              vulkan-loader
-              vulkan-validation-layers
-
-              libGL
-              libGLU
-
-              libX11
-              libxkbcommon
-              libxcb
-              libXcursor
-              libXrandr
-              libXi
-            ];
           };
+
+          devShells.default = crateOutputs.devShell.overrideAttrs (old: {
+            packages = (old.packages or [ ]) ++ shellDeps;
+          });
+          packages.default = crateOutputs.packages.release;
         };
-      };
-
-      devShells.default = crateOutputs.devShell.overrideAttrs (old: {
-        packages = (old.packages or []) ++ shellDeps;
-
-         shellHook = ''
-          ln -s
-         '';
-      });
-      packages.default = crateOutputs.packages.release;
     };
-  };
 }
