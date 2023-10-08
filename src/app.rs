@@ -12,11 +12,14 @@ use egui_tracing::EventCollector;
 use crate::{
     components::{
         button::RSFMButtonState,
-        dock::{DockTab, DockTabViewer},
-        sidebar::{SidebarButtonState, SidebarState},
+        dock::{
+            dir_view::DirViewState,
+            sidebar::{SidebarButtonState, SidebarState},
+            DockTab, DockTabViewer,
+        },
     },
     config::Config,
-    utils::icons::PhosphorIcon,
+    utils::{fs::FileData, icons::PhosphorIcon},
 };
 
 pub struct App {
@@ -49,12 +52,16 @@ impl App {
         )]);
         let surface = dock_state.main_surface_mut();
 
-        let [_sidebar, dir_view] =
-            surface.split_right(NodeIndex::root(), 0.15, vec![DockTab::DirView]);
+        let [_sidebar, dir_view] = surface.split_right(
+            NodeIndex::root(),
+            0.15,
+            vec![DockTab::DirView(DirViewState::new(FileData::new(
+                PathBuf::from("/home/tukanoid/"),
+            )))],
+        );
         let [dir_view, _terminal_log] =
             surface.split_below(dir_view, 0.8, vec![DockTab::Terminal, DockTab::Log]);
         let [_dir_view, _info] = surface.split_right(dir_view, 0.8, vec![DockTab::InfoSidebar]);
-        // TODO: layout
 
         Self {
             log_event_collector,

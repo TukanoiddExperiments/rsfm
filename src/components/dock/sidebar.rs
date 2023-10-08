@@ -1,11 +1,9 @@
 use std::path::PathBuf;
 
 use catppuccin_egui::Theme;
-use eframe::egui::{RichText, Rounding, Widget};
+use eframe::egui::{RichText, Widget};
 
 use crate::{button_newtype, utils::icons::PhosphorIcon};
-
-use super::button::RSFMButtonState;
 
 pub struct Sidebar<'a> {
     state: &'a mut SidebarState,
@@ -53,6 +51,6 @@ impl SidebarState {
 button_newtype!(SidebarButton {
     wimpl: default;
     custom_state: SidebarButtonState {
-        path: PathBuf
+        path: PathBuf,
     };
 });

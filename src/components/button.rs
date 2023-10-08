@@ -3,6 +3,7 @@ use eframe::{
     egui::{self, vec2, Align, Frame, InnerResponse, Layout, Margin, Rounding, Sense, Ui, Vec2},
     epaint::Stroke,
 };
+use egui_extras::Size;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{icons::PhosphorIcon, theme::ThemeExt};
@@ -37,7 +38,7 @@ impl<'a> RSFMButton<'a> {
             desired_size: vec2(150.0, 15.0),
             icon: None,
             icon_size: vec2(50.0, 50.0),
-            spacing: Some(2.0),
+            spacing: None,
             padding: Margin::symmetric(5.0, 5.0),
             rounding: Rounding::none(),
             border_width: None,
@@ -46,7 +47,7 @@ impl<'a> RSFMButton<'a> {
 }
 
 impl<'theme> RSFMButton<'theme> {
-    pub fn set_editable(mut self, editable: bool) -> Self {
+    pub fn with_editable(mut self, editable: bool) -> Self {
         self.editable = editable;
         self
     }
@@ -58,6 +59,11 @@ impl<'theme> RSFMButton<'theme> {
 
     pub fn with_layout(mut self, layout: Layout) -> Self {
         self.layout = layout;
+        self
+    }
+
+    pub fn with_desired_size(mut self, desired_size: impl Into<Vec2>) -> Self {
+        self.desired_size = desired_size.into();
         self
     }
 
@@ -222,6 +228,14 @@ impl RSFMButtonState {
         self.text = Some(text.into());
         self
     }
+
+    pub fn double_clicked(&self) -> bool {
+        self.double_clicked
+    }
+
+    pub fn text(&self) -> &Option<String> {
+        &self.text
+    }
 }
 
 pub trait RSFMButtonDerived {
@@ -232,41 +246,66 @@ pub trait RSFMButtonDerived {
 macro_rules! button_newtype {
     ($name:ident {
         wimpl: $wimpl_ty:tt;
+        $(custom_fields: [
+            $(& $custom_field_name_ref:ident: $custom_field_ty_ref:path,)*
+            $(&mut $custom_field_name_ref_mut:ident: $custom_field_ty_ref_mut:path,)*
+            $($custom_field_name:ident: $custom_field_ty:path,)*
+        ];)*
         $(custom_state: $cs_name:ident {
-            $($cs_field_name:ident: $cs_field_ty:path),+
+            $($cs_field_name:ident: $cs_field_ty:path,)*
         };)*
         $(modifiers: [$($mod:ident{$val:expr}),+])*
     }) => {
+        use $crate::components::button::{RSFMButtonDerived, RSFMButton, RSFMButtonState};
+
         pub struct $name<'a> {
             state: &'a mut button_newtype!(state_ty; $($cs_name)*),
             theme: &'a catppuccin_egui::Theme,
+            $(
+                $($custom_field_name: $custom_field_ty,)*
+                $($custom_field_name_ref: &'a $custom_field_ty_ref,)*
+                $($custom_field_name_ref_mut: &'a mut $custom_field_ty_ref_mut,)*
+            )*
         }
 
         impl<'a> $name<'a> {
-            pub fn new(state: &'a mut button_newtype!(state_ty; $($cs_name)*), theme: &'a catppuccin_egui::Theme) -> Self {
+            pub fn new(
+                state: &'a mut button_newtype!(state_ty; $($cs_name)*),
+                theme: &'a catppuccin_egui::Theme,
+                $(
+                    $($custom_field_name: $custom_field_ty,)*
+                    $($custom_field_name_ref: &'a $custom_field_ty_ref,)*
+                    $($custom_field_name_ref_mut: &'a mut $custom_field_ty_ref_mut,)*
+                )*
+            ) -> Self {
                 Self {
                     state,
-                    theme
+                    theme,
+                    $(
+                        $($custom_field_name,)*
+                        $($custom_field_name_ref,)*
+                        $($custom_field_name_ref_mut,)*
+                    )*
                 }
             }
         }
 
-        impl<'a> $crate::components::button::RSFMButtonDerived for $name<'a> {
-            fn to_rsfm_but(&mut self) -> $crate::components::button::RSFMButton {
+        impl<'a> RSFMButtonDerived for $name<'a> {
+            fn to_rsfm_but(&mut self) -> RSFMButton {
                 paste::paste! {
-                    $crate::components::button::RSFMButton::new(&mut self.state, &self.theme)$($(.[< with_ $mod >]($val))+)*
+                    RSFMButton::new(&mut self.state, &self.theme)$($(.[< with_ $mod >]($val))+)*
                 }
             }
         }
 
         $(
             pub struct $cs_name {
-                rsfm: $crate::components::button::RSFMButtonState,
+                rsfm: RSFMButtonState,
                 $($cs_field_name: $cs_field_ty),+
             }
 
             impl $cs_name {
-                pub fn new(rsfm: $crate::components::button::RSFMButtonState, $($cs_field_name: impl Into<$cs_field_ty>),+) -> Self {
+                pub fn new(rsfm: RSFMButtonState, $($cs_field_name: impl Into<$cs_field_ty>),+) -> Self {
                     Self {
                         rsfm,
                         $($cs_field_name: $cs_field_name.into()),+
@@ -301,8 +340,6 @@ macro_rules! button_newtype {
 
     (wimpl; custom $name:ident) => {};
     (wimpl; default $name:ident) => {
-        use $crate::components::button::RSFMButtonDerived;
-
         impl<'a> eframe::egui::Widget for $name<'a> {
             fn ui(mut self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
                 self.to_rsfm_but().ui(ui)

@@ -7,15 +7,26 @@ use macros::register_icons;
 )]
 enum PhosphorIcon {
     #[ri()]
+    Desktop,
+    #[ri()]
+    DotsNine,
+    #[ri()]
+    Download,
+
+    #[ri()]
     Folder,
     #[ri()]
     File,
+
+    #[ri()]
+    House,
+
     #[ri()]
     Link,
-    #[ri()]
-    SealWarning,
-    #[ri()]
-    Desktop,
+
     #[ri()]
     Palette,
+
+    #[ri()]
+    SealWarning,
 }
