@@ -22,51 +22,61 @@ impl<'a> DirView<'a> {
     }
 }
 
+impl<'a> DirView<'a> {
+    fn select_button(&mut self, i: usize) {
+        let DirViewState {
+            buttons,
+            current_selected_button,
+            ..
+        } = self.state;
+
+        buttons[i].select();
+        *current_selected_button = Some(i);
+    }
+
+    fn deselect_button(&mut self, i: usize) {
+        let DirViewState {
+            buttons,
+            current_selected_button,
+            ..
+        } = self.state;
+
+        buttons[i].deselect();
+
+        if &Some(i) == current_selected_button {
+            *current_selected_button = None;
+        }
+    }
+}
+
 impl<'a> Widget for DirView<'a> {
-    fn ui(self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
+    fn ui(mut self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 // TODO
             });
             ui.separator();
 
-            const MARGIN: f32 = 10.0;
-            const SPACING: f32 = 20.0;
-
             ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    const MARGIN: f32 = 10.0;
+                    const SPACING: f32 = 20.0;
+
                     let available_rect = ui.available_rect_before_wrap();
                     let available_size = available_rect.size();
 
                     let grid_size = available_size - vec2(MARGIN, MARGIN);
                     let icon_size_vec2: Vec2 = self.state.icon_size.into();
                     let button_size = icon_size_vec2 + vec2(20.0, 35.0);
-                    let num_per_row: usize = (grid_size.x + SPACING)
-                        .div(icon_size_vec2.x + SPACING)
-                        .floor() as usize;
+                    let num_per_row: usize =
+                        (grid_size.x + SPACING).div(button_size.x + SPACING).floor() as usize;
                     let rows =
                         (self.state.buttons.len() as f32 / num_per_row as f32).ceil() as usize;
 
-                    tracing::warn!("Grid Size: {grid_size:?}");
-                    tracing::warn!("Icon Size: {icon_size_vec2:?}");
-                    tracing::warn!("Button Size: {button_size:?}");
-                    tracing::warn!(
-                        "num_per_row: (gsz + s) / (is + s) = ({} + {}) / ({} + {}) = {}\nrows = {}",
-                        grid_size.x,
-                        SPACING,
-                        icon_size_vec2.x,
-                        SPACING,
-                        (grid_size.x + SPACING) / (icon_size_vec2.x + SPACING),
-                        self.state.buttons.len() as f32
-                            / ((grid_size.x + SPACING) / (icon_size_vec2.x + SPACING))
-                    );
-                    tracing::warn!(
-                        "Num: {}, Rows: {rows}, Columns: {num_per_row}",
-                        self.state.buttons.len(),
-                    );
-
                     let mut new_file_name: Option<PathBuf> = None;
+
+                    let mut new_selected_button = None;
 
                     (0..rows)
                         .fold(
@@ -88,28 +98,46 @@ impl<'a> Widget for DirView<'a> {
                             },
                         )
                         .show(ui, |mut ui| {
-                            self.state.buttons.iter_mut().for_each(|button_state| {
-                                ui.cell(|ui| {
-                                    let _response = ui.add(DirViewButton::new(
-                                        button_state,
-                                        self.theme,
-                                        self.state.icon_size,
-                                        button_size,
-                                    ));
+                            self.state.buttons.iter_mut().enumerate().for_each(
+                                |(i, button_state)| {
+                                    ui.cell(|ui| {
+                                        let response = ui.add(DirViewButton::new(
+                                            button_state,
+                                            self.theme,
+                                            self.state.icon_size,
+                                            button_size,
+                                        ));
 
-                                    if button_state.rsfm.double_clicked() {
-                                        // TODO
-                                        new_file_name = Some(button_state.file_data.path().clone());
-                                    }
-
-                                    if let Some(text) = button_state.rsfm.text().clone() {
-                                        if &text != button_state.file_data.name() {
-                                            button_state.file_data.rename(text);
+                                        if response.clicked() {
+                                            new_selected_button = Some(i);
                                         }
-                                    }
-                                });
-                            });
-                        })
+
+                                        if button_state.rsfm.double_clicked() {
+                                            // TODO
+                                            new_file_name =
+                                                Some(button_state.file_data.path().clone());
+                                        }
+
+                                        if let Some(text) = button_state.rsfm.text().clone() {
+                                            if &text != button_state.file_data.name() {
+                                                button_state.file_data.rename(text);
+                                            }
+                                        }
+                                    });
+                                },
+                            );
+                        });
+
+                    if new_selected_button != self.state.current_selected_button {
+                        match (self.state.current_selected_button, new_selected_button) {
+                            (None, None) | (Some(_), None) => {}
+                            (None, Some(new_button)) => self.select_button(new_button),
+                            (Some(old_button), Some(new_button)) => {
+                                self.deselect_button(old_button);
+                                self.select_button(new_button);
+                            }
+                        }
+                    }
                 })
         })
         .response
@@ -119,6 +147,7 @@ impl<'a> Widget for DirView<'a> {
 pub struct DirViewState {
     file_data: FileData,
     buttons: Vec<DirViewButtonState>,
+    current_selected_button: Option<usize>,
     icon_size: DirViewIconSize,
 }
 
@@ -204,6 +233,7 @@ impl DirViewState {
         Self {
             file_data,
             buttons,
+            current_selected_button: None,
             icon_size: DirViewIconSize::Small,
         }
     }
@@ -269,11 +299,17 @@ button_newtype!(DirViewButton {
 impl<'a> Widget for DirViewButton<'a> {
     fn ui(mut self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         let icon = self.state.file_data.icon();
+        let icon_size = self.icon_size;
+
         let button_size = self.button_size;
 
         self.to_rsfm_but()
-            .with_desired_size(button_size)
+            .with_icon_size(icon_size)
             .with_icon(icon)
+            .with_desired_size(button_size)
+            .with_font_size(12.0)
+            .with_text_halign(Align::Center)
+            .with_text_selected_rows(3)
             .ui(ui)
     }
 }

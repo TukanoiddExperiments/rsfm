@@ -1,12 +1,22 @@
 use catppuccin_egui::Theme;
+
 use eframe::{
-    egui::{self, vec2, Align, Frame, InnerResponse, Layout, Margin, Rounding, Sense, Ui, Vec2},
-    epaint::Stroke,
+    egui::{
+        self, vec2, Align, Frame, InnerResponse, Layout, Margin, Rounding, Sense, TextFormat, Ui,
+        Vec2,
+    },
+    epaint::{
+        text::{LayoutJob, TextWrapping},
+        FontId, Stroke,
+    },
 };
-use egui_extras::Size;
+
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{icons::PhosphorIcon, theme::ThemeExt};
+use crate::{
+    struct_with_funcs, struct_with_into_funcs, struct_with_some_funcs,
+    utils::{icons::PhosphorIcon, theme::ThemeExt},
+};
 
 pub struct RSFMButton<'a> {
     state: &'a mut RSFMButtonState,
@@ -23,6 +33,12 @@ pub struct RSFMButton<'a> {
     padding: Margin,
     rounding: Rounding,
     border_width: Option<f32>,
+
+    font_size: f32,
+    text_valign: Align,
+    text_halign: Align,
+    text_unselected_rows: usize,
+    text_selected_rows: usize,
 }
 
 impl<'a> RSFMButton<'a> {
@@ -42,60 +58,35 @@ impl<'a> RSFMButton<'a> {
             padding: Margin::symmetric(5.0, 5.0),
             rounding: Rounding::none(),
             border_width: None,
+
+            font_size: 14.0,
+            text_valign: Align::Center,
+            text_halign: Align::Min,
+            text_unselected_rows: 1,
+            text_selected_rows: 1,
         }
     }
 }
 
 impl<'theme> RSFMButton<'theme> {
-    pub fn with_editable(mut self, editable: bool) -> Self {
-        self.editable = editable;
-        self
-    }
-
-    pub fn with_selectable(mut self, selectable: bool) -> Self {
-        self.selectable = selectable;
-        self
-    }
-
-    pub fn with_layout(mut self, layout: Layout) -> Self {
-        self.layout = layout;
-        self
-    }
-
-    pub fn with_desired_size(mut self, desired_size: impl Into<Vec2>) -> Self {
-        self.desired_size = desired_size.into();
-        self
-    }
-
-    pub fn with_icon(mut self, icon: PhosphorIcon) -> Self {
-        self.icon = Some(icon);
-        self
-    }
-
-    pub fn with_icon_size(mut self, icon_size: impl Into<Vec2>) -> Self {
-        self.icon_size = icon_size.into();
-        self
-    }
-
-    pub fn with_spacing(mut self, spacing: Option<f32>) -> Self {
-        self.spacing = spacing;
-        self
-    }
-
-    pub fn with_padding(mut self, padding: impl Into<Margin>) -> Self {
-        self.padding = padding.into();
-        self
-    }
-
-    pub fn with_rounding(mut self, rounding: Rounding) -> Self {
-        self.rounding = rounding;
-        self
-    }
-
-    pub fn with_border_width(mut self, border_width: f32) -> Self {
-        self.border_width = Some(border_width);
-        self
-    }
+    struct_with_funcs![
+        editable: bool,
+        selectable: bool,
+        layout: Layout,
+        spacing: Option<f32>,
+        rounding: Rounding,
+        font_size: f32,
+        text_valign: Align,
+        text_halign: Align,
+        text_unselected_rows: usize,
+        text_selected_rows: usize
+    ];
+    struct_with_into_funcs![
+        desired_size: Vec2,
+        icon_size: Vec2,
+        padding: Margin
+    ];
+    struct_with_some_funcs![icon: PhosphorIcon, border_width: f32];
 }
 
 macro_rules! fill_rect {
@@ -140,7 +131,7 @@ impl<'theme> egui::Widget for RSFMButton<'theme> {
 
                         match self.state.editing_text {
                             true => {
-                                let response = ui.text_edit_singleline(text);
+                                let response = ui.text_edit_multiline(text);
 
                                 if response.lost_focus()
                                     && ui.input(|i| i.key_pressed(egui::Key::Enter))
@@ -149,7 +140,33 @@ impl<'theme> egui::Widget for RSFMButton<'theme> {
                                 }
                             }
                             false => {
-                                let response = ui.label(text.clone());
+                                let response = ui.label({
+                                    let mut layout_job = LayoutJob {
+                                        halign: self.text_halign,
+                                        wrap: TextWrapping {
+                                            max_rows: match self.state.selected {
+                                                true => self.text_selected_rows,
+                                                false => self.text_unselected_rows,
+                                            },
+                                            ..Default::default()
+                                        },
+                                        ..Default::default()
+                                    };
+                                    layout_job.append(
+                                        text,
+                                        0.0,
+                                        TextFormat {
+                                            font_id: FontId::new(
+                                                self.font_size,
+                                                egui::FontFamily::Proportional,
+                                            ),
+                                            color: self.theme.text,
+                                            valign: self.text_valign,
+                                            ..Default::default()
+                                        },
+                                    );
+                                    layout_job
+                                });
 
                                 match self.editable {
                                     true => text_double_clicked = response.double_clicked(),
@@ -209,20 +226,11 @@ pub struct RSFMButtonState {
 }
 
 impl RSFMButtonState {
-    pub fn with_selected(mut self, selected: bool) -> Self {
-        self.selected = selected;
-        self
-    }
-
-    pub fn with_double_clicked(mut self, double_clicked: bool) -> Self {
-        self.double_clicked = double_clicked;
-        self
-    }
-
-    pub fn with_editing_text(mut self, editing_text: bool) -> Self {
-        self.editing_text = editing_text;
-        self
-    }
+    struct_with_funcs![
+        selected: bool,
+        double_clicked: bool,
+        editing_text: bool
+    ];
 
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.text = Some(text.into());
@@ -235,6 +243,18 @@ impl RSFMButtonState {
 
     pub fn text(&self) -> &Option<String> {
         &self.text
+    }
+
+    pub fn selected(&self) -> bool {
+        self.selected
+    }
+
+    pub fn select(&mut self) {
+        self.selected = true;
+    }
+
+    pub fn deselect(&mut self) {
+        self.selected = false;
     }
 }
 
