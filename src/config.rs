@@ -131,8 +131,14 @@ impl From<Theme> for catppuccin_egui::Theme {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-struct Overrides {
+pub struct Overrides {
     paths: PathsOverrides,
+}
+
+impl Overrides {
+    pub fn paths(&self) -> &PathsOverrides {
+        &self.paths
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]

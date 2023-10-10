@@ -19,13 +19,14 @@ use crate::{
         },
     },
     config::Config,
-    utils::{fs::FileData, icons::PhosphorIcon},
+    utils::{fs::FileData, icons::PhosphorIcon, paths::Paths},
 };
 
 pub struct App {
     log_event_collector: EventCollector,
 
     config: Config,
+    paths: Paths,
     dock_state: DockState<DockTab>,
 }
 
@@ -41,13 +42,14 @@ impl App {
         cc.egui_ctx.set_fonts(fonts);
 
         let config = Config::load(override_config);
+        let paths = Paths::load(config.overrides().paths());
 
         set_theme(&cc.egui_ctx, (*config.theme()).into());
 
         let mut dock_state = DockState::new(vec![DockTab::Sidebar(
             SidebarState::default().with_my_comp_buttons(vec![SidebarButtonState::new(
                 RSFMButtonState::default().with_text("Home"),
-                PathBuf::from("/home/tukanoid/"),
+                paths.home_dir(),
             )]),
         )]);
         let surface = dock_state.main_surface_mut();
@@ -56,7 +58,7 @@ impl App {
             NodeIndex::root(),
             0.15,
             vec![DockTab::DirView(DirViewState::new(FileData::new(
-                PathBuf::from("/home/tukanoid/"),
+                paths.home_dir(),
             )))],
         );
         let [dir_view, _terminal_log] =
@@ -66,6 +68,7 @@ impl App {
         Self {
             log_event_collector,
 
+            paths,
             config,
             dock_state,
         }
