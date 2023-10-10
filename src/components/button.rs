@@ -56,7 +56,7 @@ impl<'a> RSFMButton<'a> {
             icon_size: vec2(50.0, 50.0),
             spacing: None,
             padding: Margin::symmetric(5.0, 5.0),
-            rounding: Rounding::none(),
+            rounding: Rounding::ZERO,
             border_width: None,
 
             font_size: 14.0,
@@ -215,6 +215,10 @@ impl<'theme> egui::Widget for RSFMButton<'theme> {
             fill_rect!(self, painter, response, hover);
         } else if self.state.selected {
             fill_rect!(self, painter, response, selected);
+        }
+
+        if !icon_double_clicked {
+            self.state.double_clicked = false;
         }
 
         response.widget_info(|| {
