@@ -36,6 +36,8 @@ impl App {
         override_config: Option<PathBuf>,
         log_event_collector: EventCollector,
     ) -> Self {
+        egui_extras::install_image_loaders(&cc.egui_ctx);
+
         let mut fonts = FontDefinitions::default();
         add_to_fonts(&mut fonts, Variant::Regular);
 

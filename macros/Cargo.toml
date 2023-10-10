@@ -11,6 +11,6 @@ attribute-derive = "0.8.1"
 convert_case = "0.6.0"
 diagnostics = "0.1.0"
 manyhow = { version = "0.8.1", features = ["darling"] }
-proc-macro2 = "1.0.67"
+proc-macro2 = "1.0.69"
 quote = "1.0.33"
-syn = "2.0.37"
+syn = "2.0.38"

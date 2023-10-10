@@ -53,7 +53,7 @@ pub fn register_icons(attr: TokenStream2, item: TokenStream2) -> syn::Result<Tok
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
-    let retained_image: Path = syn::parse_quote!(egui_extras::image::RetainedImage);
+    let image_source: Path = syn::parse_quote!(#egui_root::ImageSource<'static>);
     let registry_field_idents =
         variant_ri_attrs
             .iter()
@@ -77,6 +77,10 @@ pub fn register_icons(attr: TokenStream2, item: TokenStream2) -> syn::Result<Tok
                         #(#matches)*
                     }
                 }
+
+                pub fn rich_text(&self) -> eframe::egui::RichText {
+                    eframe::egui::RichText::new(format!("{}", self.symbol()))
+                }
             )
         };
         let cast_to_image = {
@@ -86,14 +90,14 @@ pub fn register_icons(attr: TokenStream2, item: TokenStream2) -> syn::Result<Tok
                 .map(|(var_ident, reg_field_ident)| quote!(Self::#var_ident => &REGISTRY.#reg_field_ident,));
 
             quote!(
-                pub fn image(&self) -> &'static #retained_image {
+                pub fn image(&self) -> &'static #image_source {
                     match self {
                         #(#matches)*
                     }
                 }
 
-                pub fn image_widget(&self, ctx: &#egui_root::Context, size: #egui_root::Vec2) -> #egui_root::Image {
-                    #egui_root::Image::new(self.image().texture_id(ctx), size)
+                pub fn image_widget(&self, size: #egui_root::Vec2) -> #egui_root::Image<'static> {
+                    #egui_root::Image::new(self.image().clone()).fit_to_exact_size(size)
                 }
             )
         };
@@ -112,7 +116,7 @@ pub fn register_icons(attr: TokenStream2, item: TokenStream2) -> syn::Result<Tok
     let icon_registry = {
         let fields = registry_field_idents
             .clone()
-            .map(|ident| quote!(#ident: #retained_image,));
+            .map(|ident| quote!(#ident: #image_source,));
         let load_fields = variant_ri_attrs
             .iter()
             .zip(registry_field_idents.clone())
@@ -121,18 +125,9 @@ pub fn register_icons(attr: TokenStream2, item: TokenStream2) -> syn::Result<Tok
                 let svg_name_span = svg_name.span();
                 let svg_path =
                     LitStr::new(&format!("{svgs_str}/{svg_name_str}.svg"), svg_name_span);
-                let expect_msg = LitStr::new(
-                    &format!("Failed to load {svg_name_str} icon"),
-                    svg_name_span,
-                );
-                let debug_name = LitStr::new(&format!("{mod_name}-{svg_name_str}"), svg_name_span);
 
                 quote!(
-                    #ident: #retained_image::from_color_image(
-                        #debug_name,
-                        egui_extras::image::load_svg_bytes(include_bytes!(#svg_path))
-                            .expect(&format!(#expect_msg))
-                    )
+                    #ident: #egui_root::include_image!(#svg_path)
                 )
             });
 

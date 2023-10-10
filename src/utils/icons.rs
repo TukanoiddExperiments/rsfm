@@ -7,6 +7,13 @@ use macros::register_icons;
 )]
 enum PhosphorIcon {
     #[ri()]
+    ArrowLeft,
+    #[ri()]
+    ArrowRight,
+    #[ri()]
+    ArrowClockwise,
+
+    #[ri()]
     Desktop,
     #[ri()]
     DotsNine,

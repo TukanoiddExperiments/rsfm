@@ -3,7 +3,7 @@ use catppuccin_egui::Theme;
 use eframe::{
     egui::{
         self, vec2, Align, Frame, InnerResponse, Layout, Margin, Rounding, Sense, TextFormat, Ui,
-        Vec2,
+        Vec2, WidgetInfo,
     },
     epaint::{
         text::{LayoutJob, TextWrapping},
@@ -116,8 +116,13 @@ impl<'theme> egui::Widget for RSFMButton<'theme> {
 
                 ui.allocate_ui_with_layout(self.desired_size, self.layout, |ui| {
                     if let Some(icon) = &self.icon {
-                        let response = ui.add(icon.image_widget(ui.ctx(), self.icon_size));
+                        let response =
+                            ui.add(icon.image_widget(self.icon_size).sense(Sense::click()));
                         icon_double_clicked = response.double_clicked();
+
+                        if icon_double_clicked {
+                            tracing::warn!("Icon double clicked");
+                        }
 
                         if response.clicked() {
                             self.state.editing_text = false;
@@ -211,6 +216,13 @@ impl<'theme> egui::Widget for RSFMButton<'theme> {
         } else if self.state.selected {
             fill_rect!(self, painter, response, selected);
         }
+
+        response.widget_info(|| {
+            WidgetInfo::labeled(
+                egui::WidgetType::Button,
+                self.state.text.clone().unwrap_or("Unknown".into()),
+            )
+        });
 
         response
     }

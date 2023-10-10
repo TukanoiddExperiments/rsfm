@@ -2,14 +2,17 @@ use std::{cmp::Ordering, fs::FileType, ops::Div, path::PathBuf};
 
 use catppuccin_egui::Theme;
 use eframe::{
-    egui::{Layout, Margin, ScrollArea, Widget},
-    emath::Align,
+    egui::{Button, Layout, Margin, ScrollArea, Widget},
+    emath::{Align, Rangef},
     epaint::{vec2, Vec2},
 };
 use egui_extras::Size;
 use egui_grid::GridBuilder;
 
-use crate::{button_newtype, utils::fs::FileData};
+use crate::{
+    button_newtype,
+    utils::{fs::FileData, icons::PhosphorIcon},
+};
 
 pub struct DirView<'a> {
     state: &'a mut DirViewState,
@@ -53,7 +56,32 @@ impl<'a> Widget for DirView<'a> {
     fn ui(mut self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
-                // TODO
+                if ui
+                    .add_enabled(
+                        self.state.current_history_ind != 0,
+                        Button::new(PhosphorIcon::ArrowLeft.rich_text()),
+                    )
+                    .clicked()
+                {
+                    self.state.history_backward();
+                }
+
+                if ui
+                    .button(PhosphorIcon::ArrowClockwise.rich_text())
+                    .clicked()
+                {
+                    self.state.reload();
+                }
+
+                if ui
+                    .add_enabled(
+                        self.state.current_history_ind < self.state.history.len() - 1,
+                        Button::new(PhosphorIcon::ArrowRight.rich_text()),
+                    )
+                    .clicked()
+                {
+                    self.state.history_forward();
+                }
             });
             ui.separator();
 
@@ -74,7 +102,7 @@ impl<'a> Widget for DirView<'a> {
                     let rows =
                         (self.state.buttons.len() as f32 / num_per_row as f32).ceil() as usize;
 
-                    let mut new_file_name: Option<PathBuf> = None;
+                    let mut new_history_path: Option<PathBuf> = None;
 
                     let mut new_selected_button = None;
 
@@ -86,12 +114,12 @@ impl<'a> Widget for DirView<'a> {
                             |grid, _row| {
                                 grid.new_row(Size::Absolute {
                                     initial: button_size.y,
-                                    range: (button_size.y, button_size.y),
+                                    range: Rangef::new(button_size.y, button_size.y),
                                 })
                                 .cells(
                                     Size::Absolute {
                                         initial: button_size.x,
-                                        range: (button_size.x, button_size.x),
+                                        range: Rangef::new(button_size.x, button_size.x),
                                     },
                                     num_per_row as i32,
                                 )
@@ -113,8 +141,8 @@ impl<'a> Widget for DirView<'a> {
                                         }
 
                                         if button_state.rsfm.double_clicked() {
-                                            // TODO
-                                            new_file_name =
+                                            tracing::warn!("Button double clicked");
+                                            new_history_path =
                                                 Some(button_state.file_data.path().clone());
                                         }
 
@@ -138,6 +166,24 @@ impl<'a> Widget for DirView<'a> {
                             }
                         }
                     }
+
+                    if let Some(new_history_path) = new_history_path {
+                        if self.state.current_history_ind < self.state.history.len() - 1 {
+                            if self.state.history[self.state.current_history_ind + 1]
+                                == new_history_path
+                            {
+                                self.state.history_forward();
+                                return;
+                            }
+
+                            self.state
+                                .history
+                                .drain(self.state.current_history_ind + 1..);
+                        }
+
+                        self.state.history.push(new_history_path);
+                        self.state.history_forward();
+                    }
                 })
         })
         .response
@@ -149,16 +195,41 @@ pub struct DirViewState {
     buttons: Vec<DirViewButtonState>,
     current_selected_button: Option<usize>,
     icon_size: DirViewIconSize,
+
+    history: Vec<PathBuf>,
+    current_history_ind: usize,
 }
 
 impl DirViewState {
     pub fn new(file_data: FileData) -> Self {
+        let files = Self::get_files(&file_data);
+
+        let history = vec![file_data.path().clone()];
+        let buttons = Self::files_to_buttons(files);
+
+        Self {
+            file_data,
+            buttons,
+            current_selected_button: None,
+            icon_size: DirViewIconSize::Small,
+
+            history,
+            current_history_ind: 0,
+        }
+    }
+
+    pub fn file_data(&self) -> &FileData {
+        &self.file_data
+    }
+
+    fn get_files(file_data: &FileData) -> Vec<FileData> {
         let mut files = walkdir::WalkDir::new(file_data.path())
             .min_depth(1)
             .max_depth(1)
             .into_iter()
             .flat_map(|e| e.map(|e| FileData::new(e.path())))
             .collect::<Vec<_>>();
+
         files.sort_by(|f1, f2| {
             let f1_t: Option<FileType> = f1.file_ty();
             let f2_t: Option<FileType> = f2.file_ty();
@@ -225,21 +296,40 @@ impl DirViewState {
             }
         });
 
-        let buttons = files
-            .into_iter()
-            .map(|fd| DirViewButtonState::new(RSFMButtonState::default().with_text(fd.name()), fd))
-            .collect();
-
-        Self {
-            file_data,
-            buttons,
-            current_selected_button: None,
-            icon_size: DirViewIconSize::Small,
-        }
+        files
     }
 
-    pub fn file_data(&self) -> &FileData {
-        &self.file_data
+    fn files_to_buttons(files: Vec<FileData>) -> Vec<DirViewButtonState> {
+        files
+            .into_iter()
+            .map(|fd| DirViewButtonState::new(RSFMButtonState::default().with_text(fd.name()), fd))
+            .collect()
+    }
+
+    pub fn history_backward(&mut self) {
+        if self.current_history_ind == 0 {
+            return;
+        }
+
+        self.set_current_history(self.current_history_ind - 1);
+    }
+
+    pub fn history_forward(&mut self) {
+        if self.current_history_ind == self.history.len() - 1 {
+            return;
+        }
+
+        self.set_current_history(self.current_history_ind + 1);
+    }
+
+    pub fn reload(&mut self) {
+        self.set_current_history(self.current_history_ind);
+    }
+
+    pub fn set_current_history(&mut self, ind: usize) {
+        self.current_history_ind = ind;
+        self.file_data = FileData::new(self.history[ind].clone());
+        self.buttons = Self::files_to_buttons(Self::get_files(&self.file_data));
     }
 }
 
@@ -266,7 +356,7 @@ impl From<DirViewIconSize> for Size {
 
         Size::Absolute {
             initial: val,
-            range: (val, val),
+            range: Rangef::new(val, val),
         }
     }
 }

@@ -33,6 +33,10 @@
             license-cli
 
             cargo-expand
+            cargo-update
+            cargo-udeps
+            cargo-unused-features
+            cargo-edit
           ];
         in
         {
